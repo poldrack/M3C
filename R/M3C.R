@@ -56,7 +56,7 @@
 # RP ADDED: edited to allow abs corr distance
 M3C <- function(mydata, montecarlo = TRUE, cores = 1, iters = 100, maxK = 10,
                 des = NULL, ref_method = c('reverse-pca', 'chol'), repsref = 100, repsreal = 100,
-                clusteralg = c('pam', 'km', 'spectral', 'hc'), distance = 'euclidean', pacx1 = 0.1, pacx2 = 0.9, printres = FALSE,
+                clusteralg = c('pam', 'km', 'spectral', 'hc'), linkage='average',distance = 'euclidean', pacx1 = 0.1, pacx2 = 0.9, printres = FALSE,
                 printheatmaps = FALSE, showheatmaps = FALSE, seed=NULL, removeplots = FALSE, dend = FALSE,
                 silent = FALSE, doanalysis = FALSE , analysistype = c('survival','kw','chi'), variable = NULL){
   
@@ -261,7 +261,7 @@ M3C <- function(mydata, montecarlo = TRUE, cores = 1, iters = 100, maxK = 10,
         message('doing the dendrogram')
       }
       optK <- which.min(real$BETA_P)+1 # use the real object
-      M3Cdendcompres <- M3Cdendcomputations(optK, mydata, allresults, distance,
+      M3Cdendcompres <- M3Cdendcomputations(optK, mydata, allresults, distance,linkage,
                                             printres=printres)
       if (silent != TRUE){
         message('finished')
@@ -739,7 +739,7 @@ ccRun <- function( d=d,
         this_assignment <- res$cluster
         names(this_assignment) <- colnames(affinitymatrix)
       }else if (clusterAlg == 'hc'){
-        this_cluster <- hclust( this_dist, method='ward.D2')
+        this_cluster <- hclust( this_dist, method=innerLinkage)
         this_assignment <- cutree(this_cluster,k)
       }
       ml[[k]] <- connectivityMatrix(this_assignment,ml[[k]],sample_x[[3]])
@@ -902,7 +902,7 @@ triangle = function(m,mode=1){
   }
 }
 
-M3Cdendcomputations <- function(optK, inputdata, realdataresults, distance,printres=printres){
+M3Cdendcomputations <- function(optK, inputdata, realdataresults, distance,linkage,printres=printres){
   k <- optK
   mydata <- inputdata
   mydist = myDist(t(mydata),method=distance)
@@ -919,7 +919,7 @@ M3Cdendcomputations <- function(optK, inputdata, realdataresults, distance,print
     colnames(medoids)[colnames(medoids)==name] <- ccid
   }
   mydist = myDist(t(medoids),method=distance)
-  hc <- hclust(mydist)
+  hc <- hclust(mydist,method=linkage)
   dend <- as.dendrogram(hc) 
   dend <- dend %>% set("branches_k_color", k = k) %>% set("branches_lwd", k)
   xy <- dend %>% get_nodes_xy()
