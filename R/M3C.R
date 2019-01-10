@@ -42,11 +42,24 @@
 #' @examples
 #' res <- M3C(mydata, cores=1, iters=100, ref_method = 'reverse-pca', montecarlo = TRUE,printres = FALSE, 
 #' maxK = 10, showheatmaps = FALSE, repsreal = 100, repsref = 100,printheatmaps = FALSE, seed = 123, des = desx)
+
+# RP ADDED:
+'%!in%' <- function(x,y)!('%in%'(x,y))
+# myDist <- function(d,method='euclidean') {
+#   if (method == 'abscorr') {
+#     return(as.dist(abs(cor(t(d),method="pearson"))))
+#   } else{
+#     return(stats::dist(d,method=method))
+#   }
+# }
+
+# RP ADDED: edited to allow abs corr distance
 M3C <- function(mydata, montecarlo = TRUE, cores = 1, iters = 100, maxK = 10,
                 des = NULL, ref_method = c('reverse-pca', 'chol'), repsref = 100, repsreal = 100,
                 clusteralg = c('pam', 'km', 'spectral', 'hc'), distance = 'euclidean', pacx1 = 0.1, pacx2 = 0.9, printres = FALSE,
                 printheatmaps = FALSE, showheatmaps = FALSE, seed=NULL, removeplots = FALSE, dend = FALSE,
                 silent = FALSE, doanalysis = FALSE , analysistype = c('survival','kw','chi'), variable = NULL){
+  
   
   if (is.null(seed) == FALSE){
     set.seed(seed)
@@ -85,9 +98,9 @@ M3C <- function(mydata, montecarlo = TRUE, cores = 1, iters = 100, maxK = 10,
     }
     distance <- 'euclidean'
   }
-  if (clusteralg == 'km' && distance != 'euclidean'){
+  if (clusteralg == 'km' && distance %!in% c('euclidean','abscorr')){
     if (silent != TRUE){
-      message('warning kmeans must be used with euclidean distance, changing to euclidean')
+      message('warning kmeans must be used with euclidean or abscorr distance, changing to euclidean')
     }
     distance <- 'euclidean'
   }
@@ -248,7 +261,8 @@ M3C <- function(mydata, montecarlo = TRUE, cores = 1, iters = 100, maxK = 10,
         message('doing the dendrogram')
       }
       optK <- which.min(real$BETA_P)+1 # use the real object
-      M3Cdendcompres <- M3Cdendcomputations(optK, mydata, allresults, printres=printres)
+      M3Cdendcompres <- M3Cdendcomputations(optK, mydata, allresults, distance,
+                                            printres=printres)
       if (silent != TRUE){
         message('finished')
       }
@@ -628,6 +642,9 @@ M3Cref <- function( d=NULL, # function for reference data
   return(newList)
 }
 
+# RP added
+absCorrDist <- function(d,method=NULL) as.dist(abs(cor(d,method="pearson")))
+
 ccRun <- function( d=d,
                    maxK=NULL,
                    repCount=NULL,
@@ -647,7 +664,7 @@ ccRun <- function( d=d,
   n <- ifelse( diss, ncol( as.matrix(d) ), ncol(d) )
   mCount = mConsist = matrix(c(0),ncol=n,nrow=n)
   ml[[1]] = c(0);
-  acceptable.distance <- c( "euclidean")
+  acceptable.distance <- c( "euclidean",'abscorr')
   main.dist.obj <- NULL
   
   if ( clusterAlg == "pam" ){ # if pam you need to make the distance matrix first
@@ -657,7 +674,7 @@ ccRun <- function( d=d,
     colnames(affinitymatrixraw) <- colnames(d) # note the order may have changed here
     rownames(affinitymatrixraw) <- colnames(d)
   }else if (clusterAlg == 'hc'){
-    main.dist.obj <- dist(t(d),method=distance )
+    main.dist.obj <- myDist(t(d),method=distance )
   }
   
   ## start the resampling loop
@@ -885,10 +902,10 @@ triangle = function(m,mode=1){
   }
 }
 
-M3Cdendcomputations <- function(optK, inputdata, realdataresults, printres=printres){
+M3Cdendcomputations <- function(optK, inputdata, realdataresults, distance,printres=printres){
   k <- optK
   mydata <- inputdata
-  mydist = dist(t(mydata))
+  mydist = myDist(t(mydata),method=distance)
   clusters <- realdataresults[[k]]$ordered_annotation$consensuscluster
   tnames <- row.names(realdataresults[[k]]$ordered_annotation)
   names(clusters) <- tnames
@@ -901,7 +918,7 @@ M3Cdendcomputations <- function(optK, inputdata, realdataresults, printres=print
     ccid <- paste('CC_',clusters[names(clusters)==name],sep='')
     colnames(medoids)[colnames(medoids)==name] <- ccid
   }
-  mydist = dist(t(medoids))
+  mydist = myDist(t(medoids),method=distance)
   hc <- hclust(mydist)
   dend <- as.dendrogram(hc) 
   dend <- dend %>% set("branches_k_color", k = k) %>% set("branches_lwd", k)
